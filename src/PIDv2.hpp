@@ -1,7 +1,7 @@
 // class for creating a pid system
 #include <Arduino.h>
 #include "custom.hpp"
-Custom my;
+Custom PIDCustom;
 class PID {
   private:
   double kp; // higher moves faster
@@ -34,7 +34,7 @@ class PID {
     {
       iError = 0;
 }else{
-      iError = my.myMin(my.myMax(pError * (double)(currentTime - lastTime) / 1000 + iError, -iErrorLimit), iErrorLimit);
+      iError = PIDCustom.myMin(PIDCustom.myMax(pError * (double)(currentTime - lastTime) / 1000 + iError, -iErrorLimit), iErrorLimit);
 }
     return kp * pError + ki * iError + kd * dError;
   }
