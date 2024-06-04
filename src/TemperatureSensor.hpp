@@ -16,7 +16,7 @@ class TemperatureSensor {
     tempK = 1 / (0.001129148 + (0.000234125 + (0.0000000876741 * tempK * tempK )) * tempK ); // kelvin
     return (tempK - 273.15); // convert kelvin to celcius
   }
-  
+  // two point calibration
   float CalibrationMath(float highIN, float lowIN, float highRef, float lowRef, float DataIN){
     float RawRange;
     float ReferenceRange;

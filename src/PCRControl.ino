@@ -1,6 +1,7 @@
 
 #include "TemperatureSensor.hpp"
 #include "PIDv2.hpp"
+#include "PIDv3.h"
 
 
 #include <math.h>
@@ -59,8 +60,13 @@ float refLow = 0; // Freezing point of water
 TemperatureSensor peltierT(thermP);
 TemperatureSensor LidT(LidP); // JD setup for thermo resistor temp 
 
-// setup pieltier PID
-PID peltierPID(5.1, 0.01, .1);
+const PIDtuning LID_PID_GAIN_SCHEDULE[] = {
+  //maxTemp, kP, kI, kD
+  { 70, 40, 0.15, 60 },
+  { 200, 80, 1.1, 10 }
+};
+
+PIDv3* PIDcontroller;
 
 void setup() {
   // setup serial
@@ -133,23 +139,23 @@ void handleSerialInput() {
       lPower = true;
     } else if (incomingCommand == "onp\n") { // turn on the pieltiers
       pPower = true;
-      peltierPID.reset();
+      PIDcontroller->reset();
     } else if (incomingCommand == "on\n") { // turn on both lid and pieltiers
-      peltierPID.reset();
+      PIDcontroller->reset();
       pPower = true;
       lPower = true;
     }
-    if (incomingCommand.substring(0,2) == "kp") { // set proportional gain
-      peltierPID.setKp(incomingCommand.substring(2).toFloat());
-    }
-    if (incomingCommand.substring(0,2) == "ki") { // set integral gain
-      peltierPID.setKi(incomingCommand.substring(2).toFloat());
-    }
-    if (incomingCommand.substring(0,2) == "kd") { // set derivitive gain
-      peltierPID.setKd(incomingCommand.substring(2).toFloat());
-    }
+    // if (incomingCommand.substring(0,2) == "kp") { // set proportional gain
+    //   peltierPID.setKp(incomingCommand.substring(2).toFloat());
+    // }
+    // if (incomingCommand.substring(0,2) == "ki") { // set integral gain
+    //   peltierPID.setKi(incomingCommand.substring(2).toFloat());
+    // }
+    // if (incomingCommand.substring(0,2) == "kd") { // set derivitive gain
+    //   peltierPID.setKd(incomingCommand.substring(2).toFloat());
+    // }
     if (incomingCommand.substring(0,2) == "pt") { // set pieltier temperature
-      peltierPID.reset();
+      PIDcontroller->reset();
       targetPeltierTemp = incomingCommand.substring(2).toFloat();
     }
     if (incomingCommand.substring(0,3) == "pia") { // set size of pieltier temperature low pass filter
@@ -181,18 +187,23 @@ void loop() {
   //currentPeltierTemp = 0.6075525829531135 * currentPeltierTemp + 15.615801552818361; // seccond estimate
 
   // 5/28/2024 temperature 2 point calibration calabration
-  currentPeltierTemp = peltierT.CalibrationMath(rawHighO,rawLowO,refHigh,refLow,currentPeltierTemp);
+  // currentPeltierTemp = peltierT.CalibrationMath(rawHighO,rawLowO,refHigh,refLow,currentPeltierTemp);
+
+  ///6/3/2024 Temperature proved to be pretty accurate with a 6.6k resistor and the logrithmic conversion equation in the Temperaturesensor.getTemps()
 
   avgPTemp = ((avgPTempSampleSize - 1) * avgPTemp + currentPeltierTemp) / avgPTempSampleSize; // average
-  peltierPWM = peltierPID.calculate(avgPTemp, targetPeltierTemp, windupTrigger); // calculate pid and set to output
+  peltierPWM = PIDcontroller->Compute(targetPeltierTemp, avgPTemp); // calculate pid and set to output
   // clamp output between -180 and 180. These were determined by the current driver having an output of 12 amps and the peltiers having a max of 9 amps with a bit of a margin below 9 amps (8.5/12 = 180/255 )
   peltierPWMClamped = CustomPCRControl.myMin(double (limitPWMH), CustomPCRControl.myMax(double (limitPWMC), peltierPWM)); 
   if (isnan(peltierPWM ) || isinf(peltierPWM )) { // reset nan and inf values
     peltierPWM = avgPPWM;
   }
-  avgPPWM = ((avgPPWMSampleSize - 1) * avgPPWM + peltierPWM) / avgPPWMSampleSize; // average
+
+  avgPPWM = ((avgPPWMSampleSize - 1) * avgPPWM + peltierPWM) / avgPPWMSampleSize; // moving average of PWM
+
   // Logic to determine anti windup. If things are looking weird it will set integral term to 0
-  windupTrigger = peltierPID.windup(avgPPWM,peltierPWMClamped,targetPeltierTemp-avgPTemp);
+  // windupTrigger = peltierPID.windup(avgPPWM,peltierPWMClamped,targetPeltierTemp-avgPTemp);
+
   // print out verbose data to serial if set
   if (verboseState) {
     Serial.print(avgPTemp);
@@ -229,7 +240,7 @@ void loop() {
     analogWrite(fpwm, 255);
     analogWrite(ppwm, 0);
 
-    peltierPID.reset();
+    PIDcontroller->reset();
     return;
   } else { // pieltiers on
     // convert pieltierDelta to pwm, inA, inB
