@@ -20,7 +20,8 @@ double PIDv3::Compute(double target, double currentValue){
   double output = (pPIDtuning->kP * pTerm) + (pPIDtuning->kI * iTerm) + (pPIDtuning->kD * dTerm);  
   
   //reset integrator if pTerm maxed out in drivable direction
-  if ((iMaxOutput && pTerm * pPIDtuning->kP > iMaxOutput) || (iMinOutput && pTerm * pPIDtuning->kP < iMinOutput)) {
+  if ((iMaxOutput && pTerm * pPIDtuning->kP > iMaxOutput) ||
+   (iMinOutput && pTerm * pPIDtuning->kP < iMinOutput)) {
     iIntegrator = 0;
   //accumulate integrator if output not maxed out in drivable direction
   } else if ((iMinOutput == 0 || output > iMinOutput) && 

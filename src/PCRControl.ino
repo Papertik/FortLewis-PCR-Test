@@ -194,7 +194,7 @@ void loop() {
   avgPTemp = ((avgPTempSampleSize - 1) * avgPTemp + currentPeltierTemp) / avgPTempSampleSize; // average
   peltierPWM = PIDcontroller->Compute(targetPeltierTemp, avgPTemp); // calculate pid and set to output
   // clamp output between -180 and 180. These were determined by the current driver having an output of 12 amps and the peltiers having a max of 9 amps with a bit of a margin below 9 amps (8.5/12 = 180/255 )
-  peltierPWMClamped = CustomPCRControl.myMin(double (limitPWMH), CustomPCRControl.myMax(double (limitPWMC), peltierPWM)); 
+  // peltierPWMClamped = CustomPCRControl.myMin(double (limitPWMH), CustomPCRControl.myMax(double (limitPWMC), peltierPWM)); 
   if (isnan(peltierPWM ) || isinf(peltierPWM )) { // reset nan and inf values
     peltierPWM = avgPPWM;
   }
