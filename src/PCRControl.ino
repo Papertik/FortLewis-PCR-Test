@@ -54,6 +54,20 @@ float rawHighG = 89.86975;
 
 float refHigh = 93.06; // boiling point of water in DURANGO CO
 float refLow = 0; // Freezing point of water
+
+// multiple linear regression coeffecients
+struct RegressionFit
+{
+  double breakpoint;
+  double slope;
+  double intercept;
+};
+// filling in regression models with empericly determined coeffeceints
+RegressionFit RedLOW = {79, 1.0266,-2.8129};
+RegressionFit RedHIGH = {79, 1.04932,-4.6107};
+RegressionFit BlackLOW = {66.9, 1.04689, 2.85};
+RegressionFit BlackHIGH = {66.9, 1.22624,-9.15267};
+
 //========================================================
 
 // setup pieltier tempature sensor
@@ -65,6 +79,7 @@ const PIDtuning LID_PID_GAIN_SCHEDULE[] = {
   { 70, 40, 0.15, 60 },
   { 200, 80, 1.1, 10 }
 };
+
 
 PIDv3* PIDcontroller;
 
@@ -173,15 +188,28 @@ void handleSerialInput() {
   }
 }
 
-void loop() {
-  handleSerialInput();
-
-  currentLidTemp = LidT.getTemp() + LidOffset; // read lid temp
-  currentPeltierTemp = peltierT.getTemp() + BaseOffset; // read pieltier temp
-  if (isnan(currentPeltierTemp) || isinf(currentPeltierTemp)) { // reset nan and inf values
+void TempAq(){
+   if(targetPeltierTemp >= BlackHIGH.breakpoint){
+  currentLidTemp = BlackHIGH.slope*LidT.getTemp()+BlackHIGH.intercept;
+ }else{
+  currentLidTemp = BlackLOW.slope*LidT.getTemp()+BlackLOW.intercept;
+ }
+ if(targetPeltierTemp >= RedHIGH.breakpoint){
+  currentPeltierTemp = RedHIGH.slope*peltierT.getTemp()+RedHIGH.intercept;
+ }else{
+    currentPeltierTemp = RedLOW.slope*peltierT.getTemp()+RedLOW.intercept;
+ }
+if (isnan(currentPeltierTemp) || isinf(currentPeltierTemp)) { // reset nan and inf values
     currentPeltierTemp = avgPTemp;
   }
 
+avgPTemp = ((avgPTempSampleSize - 1) * avgPTemp + currentPeltierTemp) / avgPTempSampleSize; // average
+
+}
+
+void loop() {
+  handleSerialInput();
+///////////////////////////////////////////TEMP SENSOR CALIBRATION///////////////////////////////////////////////////
   // old temperature calibration
   //currentPeltierTemp = 0.9090590064070043 * currentPeltierTemp + 3.725848396176527; // estimate vial temperature
   //currentPeltierTemp = 0.6075525829531135 * currentPeltierTemp + 15.615801552818361; // seccond estimate
@@ -191,7 +219,10 @@ void loop() {
 
   ///6/3/2024 Temperature proved to be pretty accurate with a 6.6k resistor and the logrithmic conversion equation in the Temperaturesensor.getTemps()
 
-  avgPTemp = ((avgPTempSampleSize - 1) * avgPTemp + currentPeltierTemp) / avgPTempSampleSize; // average
+// 6/11/24 multiple linear regression using regressions loaded into the tuning structs
+// **NOTE** Red heatshrinked sensor is peltier sensor, and black heat shrinked sensor is lid temp
+ TempAq();
+
   peltierPWM = PIDcontroller->Compute(targetPeltierTemp, avgPTemp); // calculate pid and set to output
   // clamp output between -180 and 180. These were determined by the current driver having an output of 12 amps and the peltiers having a max of 9 amps with a bit of a margin below 9 amps (8.5/12 = 180/255 )
   // peltierPWMClamped = CustomPCRControl.myMin(double (limitPWMH), CustomPCRControl.myMax(double (limitPWMC), peltierPWM)); 
