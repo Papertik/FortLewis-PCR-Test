@@ -1,6 +1,12 @@
 // for creating a temperature sensor
 // see elegooThermalResistorSch.png for wireing
 #include <arduinoSTL.h>
+struct RegressionFit
+{
+  double breakpoint;
+  double slope;
+  double intercept;
+};
 
 class TemperatureSensor {
   private:

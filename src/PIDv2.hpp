@@ -23,19 +23,19 @@ class PID {
     iError = 0;
   }
   
-  double calculate(double currentTemp, double targetTemp, bool antiWindup) { // performs pid calculation returns error
+  double calculate(double currentTemp, double targetTemp) { // performs pid calculation returns error
     lastTime = currentTime;
     currentTime = millis();
     lError = pError;
     pError = targetTemp - currentTemp;
     dError = (pError - lError) / (double)(currentTime - lastTime) / 1000;
 
-    if(antiWindup)
-    {
-      iError = 0;
-}else{
-      iError = PIDCustom.myMin(PIDCustom.myMax(pError * (double)(currentTime - lastTime) / 1000 + iError, -iErrorLimit), iErrorLimit);
-}
+//     if(antiWindup)
+//     {
+//       iError = 0;
+// }else{
+//       iError = PIDCustom.myMin(PIDCustom.myMax(pError * (double)(currentTime - lastTime) / 1000 + iError, -iErrorLimit), iErrorLimit);
+// }
     return kp * pError + ki * iError + kd * dError;
   }
 
