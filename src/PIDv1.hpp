@@ -30,19 +30,19 @@ PIDv1 (TuningStruct tuning, int minOutput, int maxOutput){
 
 // function to calculate the PID stuff
 int calculate(double targetTemp, double currentTemp){
-  error = targetTemp-currentTemp;
+  error = (targetTemp)-currentTemp;
   P = error;
   I +=error;
   D = error-previousError;
   previousError=error;
   float rawOutput = kp*P+ki*I+kd*D;
-    if (rawOutput > highClamp) {
-      rawOutput = highClamp;
-    } else if (rawOutput < lowClamp) {
-      rawOutput = lowClamp;
-    }
+  if (rawOutput > highClamp) {
+    rawOutput = highClamp;
+  } else if (rawOutput < lowClamp) {
+    rawOutput = lowClamp;
+  }
     // Anti-windup: only integrate if the output is not at the bounds
-  if (rawOutput == highClamp || rawOutput == lowClamp) {
+  if (rawOutput >= highClamp || rawOutput <= lowClamp) {
       I -= error;
   }
   output = static_cast<int>(rawOutput);
