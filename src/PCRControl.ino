@@ -1,12 +1,7 @@
 
 #include "TemperatureSensor.hpp"
-#include "PIDv2.hpp"
-#include "PIDv3.h"
+#include "PIDv1.hpp"
 
-
-#include <math.h>
-#include "custom.hpp"
-Custom CustomPCRControl; // creating instance of Custom Class to handle min and max funcitons
 // version is year.month.date.revision
 #define SOFTWARE_VERSION "2021.3.5.4"
 
@@ -55,33 +50,21 @@ float rawHighG = 89.86975;
 float refHigh = 93.06; // boiling point of water in DURANGO CO
 float refLow = 0; // Freezing point of water
 
-// multiple linear regression coeffecients
-struct RegressionFit
-{
-  double breakpoint;
-  double slope;
-  double intercept;
-};
 // filling in regression models with empericly determined coeffeceints
 RegressionFit RedLOW = {79, 1.0266,-2.8129};
 RegressionFit RedHIGH = {79, 1.04932,-4.6107};
 RegressionFit BlackLOW = {66.9, 1.04689, 2.85};
 RegressionFit BlackHIGH = {66.9, 1.22624,-9.15267};
-
 //========================================================
 
 // setup pieltier tempature sensor
 TemperatureSensor peltierT(thermP);
 TemperatureSensor LidT(LidP); // JD setup for thermo resistor temp 
 
-const PIDtuning LID_PID_GAIN_SCHEDULE[] = {
-  //maxTemp, kP, kI, kD
-  { 70, 40, 0.15, 60 },
-  { 200, 80, 1.1, 10 }
-};
+TuningStruct testTuning = {40,1,60};
 
-
-PIDv3* PIDcontroller;
+PIDv1 Controller(testTuning, 0,200);
+// PIDv3* PIDcontroller;
 
 void setup() {
   // setup serial
@@ -154,9 +137,11 @@ void handleSerialInput() {
       lPower = true;
     } else if (incomingCommand == "onp\n") { // turn on the pieltiers
       pPower = true;
-      PIDcontroller->reset();
+      // PIDcontroller->reset();
+      Controller.reset();
     } else if (incomingCommand == "on\n") { // turn on both lid and pieltiers
-      PIDcontroller->reset();
+      // PIDcontroller->reset();
+      Controller.reset();
       pPower = true;
       lPower = true;
     }
@@ -170,7 +155,8 @@ void handleSerialInput() {
     //   peltierPID.setKd(incomingCommand.substring(2).toFloat());
     // }
     if (incomingCommand.substring(0,2) == "pt") { // set pieltier temperature
-      PIDcontroller->reset();
+      // PIDcontroller->reset();
+      Controller.reset();
       targetPeltierTemp = incomingCommand.substring(2).toFloat();
     }
     if (incomingCommand.substring(0,3) == "pia") { // set size of pieltier temperature low pass filter
@@ -206,6 +192,13 @@ if (isnan(currentPeltierTemp) || isinf(currentPeltierTemp)) { // reset nan and i
 avgPTemp = ((avgPTempSampleSize - 1) * avgPTemp + currentPeltierTemp) / avgPTempSampleSize; // average
 
 }
+void PeltierControl(int PWM, float temp){
+  if(temp>=100) analogWrite(ppwm,0);// shouldnt need any temps higher than 100
+  digitalWrite(inA,HIGH);
+  digitalWrite(inB,LOW);
+  analogWrite(ppwm, abs(PWM));
+  // analogWrite(fpwm, (255-PWM));
+}
 
 void loop() {
   handleSerialInput();
@@ -223,17 +216,7 @@ void loop() {
 // **NOTE** Red heatshrinked sensor is peltier sensor, and black heat shrinked sensor is lid temp
  TempAq();
 
-  peltierPWM = PIDcontroller->Compute(targetPeltierTemp, avgPTemp); // calculate pid and set to output
-  // clamp output between -180 and 180. These were determined by the current driver having an output of 12 amps and the peltiers having a max of 9 amps with a bit of a margin below 9 amps (8.5/12 = 180/255 )
-  // peltierPWMClamped = CustomPCRControl.myMin(double (limitPWMH), CustomPCRControl.myMax(double (limitPWMC), peltierPWM)); 
-  if (isnan(peltierPWM ) || isinf(peltierPWM )) { // reset nan and inf values
-    peltierPWM = avgPPWM;
-  }
-
-  avgPPWM = ((avgPPWMSampleSize - 1) * avgPPWM + peltierPWM) / avgPPWMSampleSize; // moving average of PWM
-
-  // Logic to determine anti windup. If things are looking weird it will set integral term to 0
-  // windupTrigger = peltierPID.windup(avgPPWM,peltierPWMClamped,targetPeltierTemp-avgPTemp);
+  peltierPWM = Controller.calculate(targetPeltierTemp, avgPTemp); // calculate pid and set to output
 
   // print out verbose data to serial if set
   if (verboseState) {
@@ -252,6 +235,7 @@ void loop() {
     Serial.print(avgPPWM);
     Serial.print("\n");
   }
+
 // lid control not used in current design
   // // lid controll
   // if (lPower) {
@@ -264,25 +248,15 @@ void loop() {
   //   digitalWrite(ssr, LOW);
   // }
   
-  // pieltier control
-  if (!pPower || currentPeltierTemp > 150) { // pieltiers on, shut down if over 150C
-    digitalWrite(inA, LOW);
-    digitalWrite(inB, LOW);
-    analogWrite(fpwm, 255);
-    analogWrite(ppwm, 0);
-
-    PIDcontroller->reset();
-    return;
-  } else { // pieltiers on
-    // convert pieltierDelta to pwm, inA, inB
-    analogWrite(ppwm, abs(peltierPWM));
-    analogWrite(fpwm, 255);
-    if (peltierPWM > 0) {
-      digitalWrite(inA, HIGH);
-      digitalWrite(inB, LOW);
-    } else {// flips to cooling if PWM is below 0
-      digitalWrite(inA, LOW);
-      digitalWrite(inB, HIGH);
-    }
-  }
+  PeltierControl(peltierPWM,currentPeltierTemp);
 }
+
+
+
+
+
+
+
+
+
+
