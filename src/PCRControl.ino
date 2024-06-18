@@ -40,7 +40,6 @@ RegressionFit RedLOW = {79, 1.0266, -2.8129}; // linear regression coefficients 
 RegressionFit RedHIGH = {79, 1.04932, -4.6107}; // linear regression coefficients for red sensor HIGH range
 RegressionFit BlackLOW = {66.9, 1.04689, 2.85}; // linear regression coefficients for black sensor LOW range
 RegressionFit BlackHIGH = {66.9, 1.22624, -9.15267}; // linear regression coefficients for black sensor HIGH range
-
 // setup peltier temperature sensor
 TemperatureSensor peltierT(thermP);
 TemperatureSensor LidT(LidP); // setup for thermo resistor temp
@@ -55,58 +54,70 @@ PIDv1 HighController(highTune, 0, highClamp); // creating a PID controller to ha
 //===============================function declarations======================================
 
 // checks UART serial for any commands and executes them
-void handleSerialInput() {
+ void handleSerialInput() {
   if (Serial.available() > 0) {
     String incomingCommand = Serial.readString();
     if (incomingCommand == "whoami\n") { // print out software ID
       Serial.print("FLC-PCR software version: ");
-      Serial.println(SOFTWARE_VERSION);
+      Serial.print(SOFTWARE_VERSION);
+      Serial.print("\n");
     }
-    if (incomingCommand == "verbose\n") { // toggle sending current temp, pwm and current lid temp every loop
-      verboseState = !verboseState;
+    if (incomingCommand == "verbose\n") { // toggle sending curent temp, pwm and current lid temp every loop
+      if (verboseState) {
+        verboseState = false;
+      } else {
+        verboseState = true;
+      }
     }
-    if (incomingCommand == "pid\n") { // toggle sending target temp, current temp and pwm every loop
-      verbosePID = !verbosePID;
+    if (incomingCommand == "pid\n") { // toggle sending target temp, curent temp and pwm every loop
+      if (verbosePID) {
+        verbosePID = false;
+      } else {
+        verbosePID = true;
+      }
     }
-    if (incomingCommand == "d\n") { // request a single sample of the current temp, pwm and lid temp
+    if (incomingCommand == "d\n") { // request a single sample of the curent temp, pwm and lid temp
+      // request system data
       Serial.print(avgTemp);
       Serial.print(" ");
       Serial.print(avgPPWM);
       Serial.print(" ");
-      Serial.println(currentLidTemp);
+      Serial.print(currentLidTemp);
+      Serial.print("\n");
     }
-    if (incomingCommand == "state\n") { // check whether or not the peltiers are on or off
-      Serial.println(pPower);
+    if (incomingCommand == "state\n") { // check weather or not the pieltiers are on or off
+      Serial.print(pPower);
+      Serial.print("\n");
     }
     if (incomingCommand == "offl\n") { // turn off lid
       lPower = false;
-    } else if (incomingCommand == "offp\n") { // turn off peltiers
+    } else if (incomingCommand == "offp\n") { // turn off pieltiers
       pPower = false;
-    } else if (incomingCommand == "off\n") { // turn off both lid and peltiers
+    } else if (incomingCommand == "off\n") { // turn off both lid and pieltiers
       pPower = false;
       lPower = false;
     }
     if (incomingCommand == "onl\n") { // turn on the lid
       lPower = true;
-    } else if (incomingCommand == "onp\n") { // turn on the peltiers
+    } else if (incomingCommand == "onp\n") { // turn on the pieltiers
       pPower = true;
       LowController.reset();
       HighController.reset();
-    } else if (incomingCommand == "on\n") { // turn on both lid and peltiers
-      LowController.reset();
-      HighController.reset();
+    } else if (incomingCommand == "on\n") { // turn on both lid and pieltiers
+     LowController.reset();
+    HighController.reset();
       pPower = true;
       lPower = true;
     }
-    if (incomingCommand.startsWith("pt")) { // set peltier temperature
+    if (incomingCommand.substring(0,2) == "pt") { // set pieltier temperature
       LowController.reset();
       HighController.reset();
       targetTemp = incomingCommand.substring(2).toFloat();
     }
-    if (incomingCommand.startsWith("pia")) { // set size of peltier temperature low pass filter
+    if (incomingCommand.substring(0,3) == "pia") { // set size of pieltier temperature low pass filter
       avgTempSampleSize = incomingCommand.substring(3).toInt();
     }
-    if (incomingCommand.startsWith("poa")) { // set size of pwm low pass filter
+    if (incomingCommand.substring(0,3) == "poa") { // set size of pwm low pass filter
       avgPPWMSampleSize = incomingCommand.substring(3).toInt();
     }
   }
@@ -198,14 +209,22 @@ void loop() {
   peltierPWM = ChoosePID(targetTemp); // chooses a PID controller based on the target temp.
 
   // print out verbose data to serial if set
+    // print out verbose data to serial if set
   if (verboseState) {
-    Serial.print(currentTime);
-    Serial.print(",");
     Serial.print(avgTemp);
-    Serial.print(",");
+    Serial.print(" ");
+    Serial.print(avgPPWM);
+    Serial.print(" ");
+    Serial.print(currentLidTemp);
+    Serial.print("\n");
+  }
+  if (verbosePID) {
+    Serial.print(avgTemp);
+    Serial.print(" ");
     Serial.print(targetTemp);
-    Serial.print(",");
-    Serial.println(peltierPWM);
+    Serial.print(" ");
+    Serial.print(avgPPWM);
+    Serial.print("\n");
   }
   LidControl(currentLidTemp);
   PeltierControl(peltierPWM, currentPeltierTemp);
