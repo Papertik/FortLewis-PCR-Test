@@ -156,9 +156,9 @@ void PeltierControl(int PWM, float temp) {
 }
 
 // control lid, simple conditional statement turns it off if over 70°C
-void LidControl(float temp) {
+void LidControl(float PPWM) {
   if (lPower) {
-    if (temp < 70) {
+    if (PPWM < 100) {
       digitalWrite(ssr, HIGH);
     } else {
       digitalWrite(ssr, LOW);
@@ -203,7 +203,6 @@ void setup() {
 }
 
 void loop() {
-  unsigned long currentTime = millis() - startTime; // get current time for plotting purposes
   handleSerialInput();
   TempAcquisition();
   peltierPWM = ChoosePID(targetTemp); // chooses a PID controller based on the target temp.
@@ -226,6 +225,7 @@ void loop() {
     Serial.print(avgPPWM);
     Serial.print("\n");
   }
-  LidControl(currentLidTemp);
-  PeltierControl(peltierPWM, currentPeltierTemp);
+  LidControl(peltierPWM);
+  PeltierControl(peltierPWM, avgTemp);
+  delay(200);
 }
